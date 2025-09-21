@@ -14,11 +14,12 @@ import ru.yandex.practikum.steps.OrderSteps;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 
 import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
-import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.notNullValue;
 
 @RunWith(Parameterized.class)
 @Feature("Работа с заказами")
@@ -28,58 +29,37 @@ public class OrderCreateTests extends BaseTest {
     private OrderSteps orderSteps = new OrderSteps();
     private Order order;
     private Integer track;
+    private List<String> colors;
 
     @Parameterized.Parameter
-    public String color;
+    public List<String> colorList;
 
     @Parameterized.Parameters(name = "Создание заказа с цветом: {0}")
-    public static Collection<Object[]> colorData() {
-        return Arrays.asList(new Object[][]{
-                {"BLACK"},
-                {"GREY"}
+    public static Collection<List<String>[]> colorData() {
+        return Arrays.asList(new List[][]{
+                {Collections.singletonList("BLACK")},      // 1. Только BLACK
+                {Collections.singletonList("GREY")},       // 2. Только GREY
+                {Arrays.asList("BLACK", "GREY")},          // 3. BLACK + GREY
+                {null}                                     // 4. Без цвета
         });
     }
 
     @Test
-    @DisplayName("Можно создать заказ с одним цветом")
-    public void shouldCreateOrderWithSingleColor() {
+    @DisplayName("Можно создать заказ с разными вариантами цветов")
+    public void shouldCreateOrderWithDifferentColors() {
         order = createTestOrder();
-        order.setColor(Collections.singletonList(color));
+        order.setColor(colorList);  // ✅ Используем параметр из @Parameterized
 
         track = orderSteps.createOrder(order)
                 .statusCode(HTTP_CREATED)
-                .body("track", notNullValue())
+                .body("track", notNullValue())  // ✅ Тело ответа содержит track
                 .extract()
                 .body()
                 .path("track");
-    }
 
-    @Test
-    @DisplayName("Можно создать заказ с двумя цветами")
-    public void shouldCreateOrderWithBothColors() {
-        order = createTestOrder();
-        order.setColor(Arrays.asList("BLACK", "GREY"));
-
-        track = orderSteps.createOrder(order)
-                .statusCode(HTTP_CREATED)
-                .body("track", notNullValue())
-                .extract()
-                .body()
-                .path("track");
-    }
-
-    @Test
-    @DisplayName("Можно создать заказ без указания цвета")
-    public void shouldCreateOrderWithoutColor() {
-        order = createTestOrder();
-        order.setColor(null);
-
-        track = orderSteps.createOrder(order)
-                .statusCode(HTTP_CREATED)
-                .body("track", notNullValue())
-                .extract()
-                .body()
-                .path("track");
+        // Проверяем, что трек не null и больше 0
+        org.junit.Assert.assertNotNull(track);
+        org.junit.Assert.assertTrue(track > 0);
     }
 
     @Test
@@ -91,7 +71,7 @@ public class OrderCreateTests extends BaseTest {
         // Создаем заказ и сразу проверяем ответ
         ValidatableResponse response = orderSteps.createOrder(order)
                 .statusCode(HTTP_CREATED)
-                .body("track", notNullValue());
+                .body("track", notNullValue());  // ✅ Track в ответе
 
         track = response.extract().body().path("track");
 
@@ -99,7 +79,7 @@ public class OrderCreateTests extends BaseTest {
         org.junit.Assert.assertNotNull(track);
         org.junit.Assert.assertTrue(track > 0);
 
-        // Проверяем, что заказ существует по треку (без проверки firstName - баг API)
+        // Проверяем, что заказ существует по треку (только track - баг API)
         orderSteps.getOrderByTrack(track.toString())
                 .statusCode(HTTP_OK)
                 .body("order.track", equalTo(track));  // ✅ Проверяем только track
